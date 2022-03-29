@@ -1,0 +1,65 @@
+outputFolder =fullfile('caltech101')
+rootFolder = fullfile(outputFolder,'101_objectCategories'); % load data 
+categories = {'airplanes','ferry','laptop'}; %we are choosing 3 categories 
+  imds = imageDatastore(fullfile(rootFolder,categories),'LabelSource','foldernames','ReadFcn',@im_pro); %create image data stror to manage data so the images in categories are now in imds 
+  %count the number of images in categories 
+  tbl = countEachLabel(imds)
+  %wish categorie has least number 
+  minSetCount = min(tbl{:,2})
+  %reduce each categorie to 67 so we update our imds 
+  imds =splitEachLabel(imds,minSetCount,'randomize');
+  countEachLabel(imds);
+  airplanes = find(imds.Labels == 'airplanes' ,1);
+  ferry = find(imds.Labels == 'ferry' ,1);
+  laptop = find(imds.Labels == 'laptop' ,1);
+  figure
+  subplot(2,2,1);
+  imshow(readimage(imds,airplanes));
+  subplot(2,2,2);
+  imshow(readimage(imds,ferry));
+  subplot(2,2,3);
+  imshow(readimage(imds,laptop));
+  
+  img = readimage(imds,1);
+  size(img)
+  numTrainFiles = 40;
+[imdsTrain,imdsValidation] = splitEachLabel(imds,numTrainFiles,'randomize');
+%Define Network Architecture
+layers = [
+    imageInputLayer([28 28 3])
+    
+    convolution2dLayer(3,8,'Padding',1)
+    batchNormalizationLayer
+    reluLayer
+    
+    maxPooling2dLayer(2,'Stride',2)
+    
+    convolution2dLayer(3,16,'Padding',1)
+    batchNormalizationLayer
+    reluLayer
+    
+    maxPooling2dLayer(2,'Stride',2)
+    
+    convolution2dLayer(3,32,'Padding',1)
+    batchNormalizationLayer
+    reluLayer
+    
+    fullyConnectedLayer(3)
+    softmaxLayer
+    classificationLayer];
+  
+ %Specify Training Options
+options = trainingOptions('sgdm', ...
+    'MaxEpochs',4, ...
+    'ValidationData',imdsValidation, ...
+    'ValidationFrequency',30, ...
+    'Verbose',false, ...
+    'Plots','training-progress');
+%Train Network Using Training Data
+net = trainNetwork(imdsTrain,layers,options);
+%Classify Validation Images and Compute Accuracy
+YPred = classify(net,imdsValidation);
+YValidation = imdsValidation.Labels;
+
+accuracy = sum(YPred == YValidation)/numel(YValidation)
+
